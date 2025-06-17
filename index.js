@@ -1,13 +1,24 @@
 const express = require('express');
 const cors = require('cors');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY); // make sure it's set in Render
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY); // make sure this is set in Render
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+const PACKAGE_PRICES = {
+  "Starter": 8999,
+  "Pro": 14999,
+  "Business+": 24999
+};
+
 app.post('/create-checkout-session', async (req, res) => {
-  const { price } = req.body;
+  const { package } = req.body;
+  const price = PACKAGE_PRICES[package];
+
+  if (!price) {
+    return res.status(400).json({ error: 'Invalid package selected' });
+  }
 
   try {
     const session = await stripe.checkout.sessions.create({
@@ -18,7 +29,7 @@ app.post('/create-checkout-session', async (req, res) => {
           price_data: {
             currency: 'gbp',
             product_data: {
-              name: 'CamsWebs Website Package',
+              name: `CamsWebs - ${package} Package`,
             },
             unit_amount: price,
           },
@@ -29,7 +40,7 @@ app.post('/create-checkout-session', async (req, res) => {
       cancel_url: 'https://camswebs.github.io/camswebs/',
     });
 
-    res.json({ url: session.url }); // ✅ IMPORTANT: return the actual URL
+    res.json({ url: session.url });
   } catch (err) {
     console.error("Stripe error:", err);
     res.status(500).json({ error: 'Checkout session creation failed' });
